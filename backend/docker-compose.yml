@@ -1,0 +1,65 @@
+# version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: saas_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-daemon}
+      POSTGRES_DB: ${DB_NAME:-saas_db}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - saas_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: saas_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - saas_network
+
+  backend:
+    build: .
+    container_name: saas_backend
+    ports:
+      - "3002:3001"
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-daemon}@postgres:5432/${DB_NAME:-saas_db}
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-supersecretkey}
+      - JWT_SECRET=${JWT_SECRET:-supersecretkey}
+      - PORT=3001
+    command: npm run dev
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - saas_network
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3002/api
+    container_name: saas_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3002/api
+    networks:
+      - saas_network
+
+networks:
+  saas_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

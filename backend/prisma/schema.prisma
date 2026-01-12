@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPERADMIN
+  DIRECTEUR
+  GERANT
+  VENDEUR
+  MAGASINIER
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique // For subdomain or path routing
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  products  Product[]
+  sales     Sale[]
+  
+  // Subscription details could go here
+}
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  password        String
+  name            String?
+  role            Role     @default(VENDEUR)
+  
+  // Multi-tenancy
+  tenantId        String?
+  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+
+  // Profile
+  imagePath       String?
+
+  // Security
+  is2FAEnabled    Boolean  @default(false)
+  twoFactorSecret String?
+
+  sales           Sale[]   @relation("SalesBy")
+  auditLogs       AuditLog[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  sku         String
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  imagePath   String?
+  category    String?
+  description String?
+  status      String   @default("ACTIVE") // ACTIVE, DRAFT, OUT_OF_STOCK
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  saleItems   SaleItem[]
+  stockMovements StockMovement[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, sku]) // SKU must be unique per tenant
+}
+
+model Sale {
+  id          String   @id @default(uuid())
+  totalAmount Decimal  @db.Decimal(10, 2)
+  status      String   @default("COMPLETED") // PENDING, COMPLETED, CANCELLED
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  userId      String
+  user        User     @relation("SalesBy", fields: [userId], references: [id])
+
+  items       SaleItem[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SaleItem {
+  id        String   @id @default(uuid())
+  quantity  Int
+  unitPrice Decimal  @db.Decimal(10, 2)
+  
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id])
+  
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+model StockMovement {
+  id          String   @id @default(uuid())
+  quantity    Int      // Positive for add, negative for remove
+  reason      String   // "SALE", "RESTOCK", "CORRECTION"
+  
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String   // e.g., "CREATE_PRODUCT", "LOGIN"
+  resource  String   // e.g., "Product", "User"
+  details   Json?
+  ip        String?
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+}
