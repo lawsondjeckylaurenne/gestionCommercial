@@ -52,7 +52,30 @@ docker-compose up
 
 **Temps de démarrage estimé :** 2-5 minutes (selon votre connexion internet)
 
-### 4. Vérifier que les services sont démarrés
+### 4. Initialiser la base de données
+
+```bash
+# Réinitialiser complètement la base de données (supprime toutes les données)
+docker exec saas_backend npx prisma migrate reset --force
+
+# Synchroniser le schéma avec la base de données
+docker exec saas_backend npx prisma db push
+
+# Insérer les données de test (seed)
+docker exec saas_backend npm run seed
+```
+
+**⚠️ Important :** Ces commandes créent la structure de la base de données et ajoutent les comptes de test.
+
+**Alternative pour mise à jour sans perte de données :**
+```bash
+# Si vous voulez juste appliquer les migrations sans tout supprimer
+docker exec saas_backend npx prisma migrate deploy
+docker exec saas_backend npx prisma generate
+docker exec saas_backend npm run seed
+```
+
+### 5. Vérifier que les services sont démarrés
 
 ```bash
 # Vérifier l'état des containers
@@ -66,7 +89,7 @@ docker-compose ps
 # saas_redis        "docker-entrypoint.s…"  redis       running     0.0.0.0:6379->6379/tcp
 ```
 
-### 5. Accéder à l'application
+### 6. Accéder à l'application
 
 Une fois tous les services démarrés :
 
@@ -134,11 +157,26 @@ docker-compose logs -f backend
 ### Gestion de la base de données
 
 ```bash
+# Réinitialiser complètement la base de données
+docker exec saas_backend npx prisma migrate reset --force
+
+# Appliquer les migrations manuellement
+docker exec saas_backend npx prisma migrate deploy
+
+# Regénérer le client Prisma après modifications du schéma
+docker exec saas_backend npx prisma generate
+
+# Réexécuter le seed (données de test)
+docker exec saas_backend npm run seed
+
 # Accéder à la console PostgreSQL
 docker exec -it saas_postgres psql -U postgres -d gestcom
 
 # Voir les tables
 \dt
+
+# Voir les données d'une table
+SELECT * FROM "User" LIMIT 5;
 
 # Quitter la console
 \q
@@ -373,12 +411,12 @@ docker images
 - [ ] Projet cloné localement
 - [ ] Dans le dossier `backend/`
 - [ ] `docker-compose up -d` exécuté
+- [ ] **Base de données initialisée** (`npx prisma migrate deploy`)
+- [ ] **Données de test ajoutées** (`npm run seed`)
 - [ ] Tous les services sont "running" (`docker-compose ps`)
 - [ ] Frontend accessible sur http://localhost:3000
 - [ ] Backend accessible sur http://localhost:3002
 - [ ] Connexion testée avec un compte de test
 - [ ] 2FA configuré et fonctionnel
-
-🎉 **Félicitations !** GestCom est maintenant opérationnel sur votre machine.
 
 Pour aller plus loin, consultez la documentation complète dans le dossier `docs/`.
